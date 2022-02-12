@@ -1,0 +1,23 @@
+{
+    "id": 1000,
+    "name": "hello-world-project",
+    "last-updated": "2012-04-23T18:25:43.511Z",
+    "tests": [
+        {
+        "id": 1,
+        "name": "first-test",
+        "last-updated": "2012-04-23T18:25:43.511Z",
+        "pre-script": "/pre.sh",
+        "cmd": "echo \"hello world 1\"",
+        "post-script": "/post.sh"
+        },
+        {
+        "id": 2,
+        "name": "second-test",
+        "last-updated": "2012-04-23T18:25:43.511Z",
+        "pre-script": "/pre.sh",
+        "cmd": "echo \"hello world 2\"",
+        "post-script": "/post.sh"
+        }
+    ]
+}
