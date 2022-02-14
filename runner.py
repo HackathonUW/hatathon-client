@@ -19,7 +19,7 @@ init()
 
 # uuid, project id, email
 
-def runProgram(testid: int, command: str, **kwargs) -> json:
+def runProgram(testid: int, command: str, **kwargs) -> any:
     """
     Run the provided command, noting its test id.
 
@@ -32,19 +32,34 @@ def runProgram(testid: int, command: str, **kwargs) -> json:
 
     p = subprocess.Popen([command], shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     if ("stdin" in kwargs):
-        print(kwargs.get("stdin"))
+        #print(kwargs.get("stdin"))
         out, err = p.communicate(input=kwargs.get("stdin").encode())
     else:
         out, err = p.communicate()
 
-    data = {}
-    data['test_id'] = testid
-    data['returncode'] = p.returncode
-    data['stdout'] = out
-    data['stderr'] = err
-
+    data = [testid, p.returncode, out.decode(), err]
     return data;
 
+def setup_run(project_id: int, session_id: str) -> any:
+    """
+    Sets up the run
+    
+    Returns json object of project, or None on error.
+    """
+
+    email = "xuegeoff@gmail.com"
+
+    try:
+        r = requests.post('https://hatathon-backend.herokuapp.com/run', json={'uuid':session_id, 'projectid':project_id, 'email':email})
+
+        if (r.status_code != 200):
+            print(f"Server responded to SETUP RUN request for {session_id} with error code.")
+            return None
+        else:
+            return r.status_code
+    except:
+        print("Error making request for setup run.")
+        return None
 
 def get_project(session_id: str) -> any:
     """
@@ -63,37 +78,6 @@ def get_project(session_id: str) -> any:
     except:
         print("Error making request for project details.")
         return None
-'''
-def get_testcases(project: json):
-    """
-    Get the testcases by id.
-    
-    param project: The json representation of the project to get the testcases from.
-    Returns json object of test cases, or None on error.
-    """
-    proj_id = None
-
-    first_test = json.loads(project)[0]
-    proj_id: int = first_test['project']
-    try:
-        pass
-    except:
-        print("Cannot extract project id from empty project.")
-        return None
-
-    try:
-        assert proj_id is not None;
-        r = requests.post('https://hatathon-backend.herokuapp.com/get', json={'type':'testcases', 'proj_id':proj_id})
-        print(json.dumps(r, indent=4, sort_keys=True))
-        if (r.status_code != 200):
-            print(f"Server responded to request for {session_id} with error code.")
-            return None
-        else:
-            return r.json()
-    except:
-        print("Error making request for project details.")
-        return None
-'''
 
 def get_input(test) -> str:
     """Get the input for the test."""
@@ -115,26 +99,6 @@ def get_input(test) -> str:
         
         return r.content.decode()
 
-def get_input(test) -> str:
-    """Get the input for the test."""
-    #https://hatathon-backend.herokuapp.com/static/{input}
-
-    if ('input' not in test):
-        print("Error: No input file specified. Test must have an \"input\" field.")
-    
-    if (test['input'] is None):
-        print("No input for test.")
-        return None
-    
-    else:
-        url = f"https://hatathon-backend.herokuapp.com{requests.utils.quote(test['input'])}"
-        r = requests.get(url)
-
-        if (r.status_code != 200):
-            print(f"Server responded to request for {session_id} input with error code {r.status_code}.")
-            return None
-        
-        return r.content.decode()
 
 def get_output(test) -> str:
     """Get the output for the test."""
@@ -148,7 +112,7 @@ def get_output(test) -> str:
         return None
 
     else:
-        url = f"https://hatathon-backend.herokuapp.com{requests.utils.quote(test['input'])}"
+        url = f"https://hatathon-backend.herokuapp.com{requests.utils.quote(test['output'])}"
         r = requests.get(url)
 
         if (r.status_code != 200):
@@ -172,7 +136,7 @@ def return_results(session_id: str, test_id: int, status: int):
         r = requests.post('https://hatathon-backend.herokuapp.com/edit', json={'type':'res', 'uuid':session_id, 'testid':test_id, 'status':status})
 
         if (r.status_code != 200):
-            print(f"Server responded to request for {session_id} with error code.")
+            print(f"Server responded to request for {session_id} with error code {r.status_code}.")
 
     except:
         print("Error making request for project details.")
@@ -183,11 +147,14 @@ Main function
 if __name__ == '__main__':
     print(Style.BRIGHT+"Crowd Code Test Runner"+Style.RESET_ALL)
 
-    if (len(sys.argv) != 2 or '--help' in sys.argv or '-h' in sys.argv):
-        print("Usage: runner.py <session_id>")
+    if (len(sys.argv) != 3 or '--help' in sys.argv or '-h' in sys.argv):
+        print("Usage: runner.py <project_id> <session_id>")
         sys.exit(1)
 
-    session_id = sys.argv[1]
+    project_id = sys.argv[1]
+    session_id = sys.argv[2]
+
+    setup_run(project_id, session_id)
 
     project = get_project(session_id)
     if (project is None):
@@ -210,56 +177,45 @@ if __name__ == '__main__':
     for test in iter(project):
         if (test['disabled']):
             continue
+
         return_results(session_id, test['pid'], STATUS['RUNNING'])
 
         print(f"{'['+str(test['pid'])+']':<6}{test['command']}\t{test['author']}")
-        #print(f"Command: {test['command']}")
-        print("-----------------------------------------------------")
-        print(Style.BRIGHT+"INPUT"+Style.RESET_ALL+'\n'+get_input(test))
-        print("-----------------------------------------------------")
-        print(Style.BRIGHT+"EXPECTED OUTPUT"+Style.RESET_ALL+'\n'+get_output(test))
-        print("-----------------------------------------------------")
 
-        return_results(session_id, test['pid'], STATUS['FAIL'])
-
-
-        # get input for test
-
-        # run test
-
-        # diff output against expected output
-
-        # send result to server
+        testinput = get_input(test)
+        testoutput = get_output(test)
+        #print(testoutput)
         
-    #for testcase in testcases:
-    #    runProgram()
-    #print(runProgram(1,"echo Hello World"))
-    #print(runProgram(2,"cat", stdin="Hello World"))
+        #print(f"Command: {test['command']}")
+        #print("-----------------------------------------------------")
+        #print(Style.BRIGHT+"INPUT"+Style.RESET_ALL+'\n'+get_input(test))
+        #print("-----------------------------------------------------")
+        #print(Style.BRIGHT+"EXPECTED OUTPUT"+Style.RESET_ALL+'\n'+get_output(test))
+        #print("-----------------------------------------------------")
 
+        run = {}
+        if (testinput is not None):
+            if (test['input'] is not None):
+                run = runProgram(test['pid'], test['command'], stdin=test['input'])
+            else:
+                run = runProgram(test['pid'], test['command'])
+        returncode = run[1]
 
-# get request to 
+        # send results to server
+        if returncode == 0:
+            if testoutput is not None:
+                if run[2] == testoutput:
+                    return_results(session_id, test['pid'], STATUS['SUCCESS'])
+                    print("success")
+                else:
+                    #print(testoutput)
+                    #print(run[2])
+                    return_results(session_id, test['pid'], STATUS['FAIL'])
+                    print("fail 2")
+            else:
+                return_results(session_id, test['pid'], STATUS['SUCCESS'])
+                print("success")
 
-
-
-
-def test_url_from_id(id):
-    return "https://demo.noguera.dev/api/{}".format(SERVER, id)
-
-def get_by_id(id):
-    response = requests.get(TESTURL)
-    return response.json()
-
-def parse_project(project):
-    """Parse the project file."""
-
-def parse_test(test):
-    """Parse the test."""
-
-def run(command):
-    """Run the specified test or project."""
-    subprocess = subprocess.Popen("echo Hello World", shell=True, stdout=subprocess.PIPE)
-    subprocess_return = subprocess.stdout.read()
-    print(subprocess_return)
-    
-
-
+        else:
+            return_results(session_id, test['pid'], STATUS['FAIL'])
+            print("fail")
